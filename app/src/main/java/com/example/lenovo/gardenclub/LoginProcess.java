@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Display;
 import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -43,14 +44,19 @@ public class LoginProcess extends AppCompatActivity {
     WebView mWebView;
     String password, username;
     Intent intent, in;
-    int i = 0;
     StringBuilder str;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Log.i(TAG, "onCreate()");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_members_only);
         mWebView = findViewById(R.id.webview);
+
+        // Enable JS
+        WebSettings webSettings = mWebView.getSettings();
+        webSettings.setJavaScriptEnabled(true);
+
         intent = new Intent(this, ContactList.class);
         submit = findViewById(R.id.submitButton);
         UsernameEt = findViewById(R.id.usernameEditText);
@@ -59,58 +65,98 @@ public class LoginProcess extends AppCompatActivity {
         btnHome.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                in = new Intent(LoginProcess.this, MainActivity.class);
-                startActivity(in);
+            in = new Intent(LoginProcess.this, MainActivity.class);
+            startActivity(in);
             }
         });
+
         submit.setOnClickListener(new View.OnClickListener() {
             @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
             @Override
             public void onClick(View v) {
                 Toast.makeText(getApplicationContext(), "Loading...", Toast.LENGTH_LONG).show();
                 username = UsernameEt.getText().toString().trim();
+                Log.i(TAG, "username:" + username + ";");
                 password = PasswordEt.getText().toString();
-                i++;
-                WebSettings webSettings = mWebView.getSettings();
-                webSettings.setJavaScriptEnabled(true);
+                Log.i(TAG, "password:" + password + ";");
+//                WebSettings webSettings = mWebView.getSettings();
+//                webSettings.setJavaScriptEnabled(true);
                 final WebAppInterface webAppInterface = new WebAppInterface(LoginProcess.this);
                 mWebView.addJavascriptInterface(webAppInterface, "Android");
 
                 mWebView.setWebViewClient(new WebViewClient() {
                     @Override
                     public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                        Log.i(TAG, "shouldOverrideUrlLoading(view, url)");
+                        Log.i(TAG, "url:" + url + ";");
                         view.loadUrl(url);
                         return true;
+                    }
+
+                    public boolean isLoggedIn(String url) {
+                        return url.equals("http://www.capefeargardenclub.org/");
+                    }
+
+                    public boolean needLogin(String url) {
+                        return url.equals("http://www.capefeargardenclub.org/wp-login.php?redirect_to=%2f");
+                    }
+
+                    public boolean isURLSet(String inStr) {
+                        return (inStr != null);
+                    }
+
+                    public String JSLoginText() {
+                        String js =
+                            "var objPWD = '';" +
+                            "var objAccount = '';" +
+                            "var str = '';" +
+                            "var inputs = document.getElementsByTagName('input');" +
+                            "for (var i = 0; i < inputs.length; i++) {" +
+                                "if (inputs[i].name.toLowerCase() === 'pwd') {" +
+                                    "inputs[i].value = objPWD;" +
+                            "}" +
+                            "else if (inputs[i].name.toLowerCase() === 'log') {" +
+                                    "inputs[i].value = objAccount;" +
+                                "}" +
+                            "}" +
+                            "if (objAccount != null) {" +
+                                "console.log('objAccount: ' + objAccount + ';');" +
+                                "str += objAccount.value;" +
+                            "}" +
+                            "if (objPWD != null) { " +
+                                 "str += ' , ' + objPWD.value;" +
+                            "}" +
+                            "document.getElementById('loginform').submit();";
+                        return js;
+                    }
+
+                    public void Login(WebView view) {
+                        Log.i(TAG, "Initiating Login");
+                        view.loadUrl("javascript:" + JSLoginText());
+                    }
+
+                    public void DisplayPage() {
+                        new BackgroundTask().execute();
                     }
 
                     @Override
                     public void onPageFinished(WebView view, String url) {
                         String viewURL = view.getUrl();
-                        if (viewURL != null) {
-                            if (view.getUrl().equals("http://www.capefeargardenclub.org/wp-login.php?redirect_to=%2f")) {
-                                StringBuilder sb = new StringBuilder();
-                                sb.append("var objPWD = '" + password + "';objAccount  = '" + username + "';var str = '';");
-                                sb.append("var inputs = document.getElementsByTagName('input');");
-                                sb.append("for (var i = 0; i < inputs.length; i++) {");
-                                sb.append("if (inputs[i].name.toLowerCase() === 'pwd') {inputs[i].value = '" + password + "';}");
-                                sb.append("else if (inputs[i].name.toLowerCase() === 'log') {inputs[i].value = '" + username + "';}");
-                                sb.append("}");
-                                sb.append("if (objAccount != null) {str += objAccount.value;}");
-                                sb.append("console.log('a');");
-                                sb.append("if (objPWD != null) { str += ' , ' + objPWD.value;}");
-                                sb.append("console.log('b');");
-                                sb.append("console.log('c');");
-                                sb.append("console.log('d');");
-                                sb.append("document.getElementById('loginform').submit();");
-                                sb.append("console.log('e');");
-                                sb.append("console.log('f');");
-                                view.loadUrl("javascript:" + sb.toString());
-                                i++;
-                            } else if (viewURL.equals("http://www.capefeargardenclub.org/")) {
+                        Log.i(TAG, "onPageFinished(view, url)");
+                        Log.i(TAG, "url:" + url + ";");
+                        Log.i(TAG, "viewURL:" + viewURL + ";");
+
+                        if (isURLSet(viewURL)) {
+                            if (needLogin(viewURL)) {
+                                Log.i(TAG, "First Time Through");
+                                Login(view);
+                            } else if (isLoggedIn(viewURL)) {
+                                Log.i(TAG, "Login Success.");
                                 mWebView.setVisibility(View.GONE);
                                 Toast.makeText(getApplicationContext(), "Login Successful: Loading directory data...", Toast.LENGTH_LONG).show();
-                                new BackgroundTask().execute();
+                                DisplayPage();
                             } else  {
+                                Log.i(TAG, "Unexpected URL -> " + viewURL);
                                 Toast.makeText(getApplicationContext(), "Email or password is incorrect. Please try again.", Toast.LENGTH_LONG).show();
                             }
                         }
@@ -119,6 +165,7 @@ public class LoginProcess extends AppCompatActivity {
 
                 LoginProcess.this.runOnUiThread(new Runnable() {
                     public void run() {
+                        Log.i(TAG, "LoginProcess.this.runOnUiThread()");
                         mWebView.loadUrl("http://www.capefeargardenclub.org/wp-login.php?redirect_to=%2f");
                     }
                 });
@@ -129,16 +176,19 @@ public class LoginProcess extends AppCompatActivity {
 
     @Override
     protected void onPostCreate(@Nullable Bundle savedInstanceState) {
+        Log.i(TAG, "postCreate()");
         super.onPostCreate(savedInstanceState);
     }
 
     @SuppressLint("StaticFieldLeak")
     class BackgroundTask extends AsyncTask<Void,Void,String> {
+
         String json_url;
         private static final String TAG = "BackgroundTask";
 
         @Override
         protected String doInBackground(Void... voids) {
+            Log.i(TAG, "doInBackground()");
             HttpClient client = new DefaultHttpClient();
             HttpPost httpPost = new HttpPost(json_url);
             str = new StringBuilder();
@@ -149,6 +199,8 @@ public class LoginProcess extends AppCompatActivity {
             params.add(new BasicNameValuePair("password", password));
             params.add(new BasicNameValuePair("method", "some_json"));
             try {
+                Log.i(TAG, "Initial Post");
+                Log.i(TAG, "params: " + params + ';');
                 httpPost.setEntity(new UrlEncodedFormEntity(params));
                 HttpResponse response = client.execute(httpPost);
                 StatusLine statusLine = response.getStatusLine();
@@ -168,8 +220,10 @@ public class LoginProcess extends AppCompatActivity {
                     Log.e("Log", "Failed to download result..");
                 }
             } catch (ClientProtocolException e) {
+                Log.e(TAG, "Client Protocol exception:" + e.toString() + ";");
                 e.printStackTrace();
             } catch (IOException e) {
+                Log.e(TAG, "IO exception:" + e.toString() + ";");
                 e.printStackTrace();
             }
             return null;
@@ -178,7 +232,6 @@ public class LoginProcess extends AppCompatActivity {
         @Override
         protected void onPreExecute() {
             json_url = "http://capefeargardenclub.org/cfgcTestingJSON/login.php";
-
         }
 
         @Override
@@ -188,6 +241,7 @@ public class LoginProcess extends AppCompatActivity {
 
         @Override
         protected void onPostExecute(String result) {
+            Log.i(TAG, "onPostExecute()");
             json_string = result;
             if (json_string != null) {
                 intent.putExtra("json_data", json_string);
@@ -198,9 +252,6 @@ public class LoginProcess extends AppCompatActivity {
                 new BackgroundTask().execute();
 
             }
-
-
         }
     }
-
 }
