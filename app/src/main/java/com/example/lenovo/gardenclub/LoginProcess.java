@@ -52,8 +52,6 @@ public class LoginProcess extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_members_only);
         mWebView = findViewById(R.id.webview);
-
-        // Enable JS
         WebSettings webSettings = mWebView.getSettings();
         webSettings.setJavaScriptEnabled(true);
 
@@ -79,8 +77,6 @@ public class LoginProcess extends AppCompatActivity {
                 Log.i(TAG, "username:" + username + ";");
                 password = PasswordEt.getText().toString();
                 Log.i(TAG, "password:" + password + ";");
-//                WebSettings webSettings = mWebView.getSettings();
-//                webSettings.setJavaScriptEnabled(true);
                 final WebAppInterface webAppInterface = new WebAppInterface(LoginProcess.this);
                 mWebView.addJavascriptInterface(webAppInterface, "Android");
 
@@ -106,10 +102,11 @@ public class LoginProcess extends AppCompatActivity {
                     }
 
                     public String JSLoginText() {
+                        username = UsernameEt.getText().toString().trim();
+                        password = PasswordEt.getText().toString();
                         String js =
-                            "var objPWD = '';" +
-                            "var objAccount = '';" +
-                            "var str = '';" +
+                            "var objPWD = '" + password + "';" +
+                            "var objAccount = '" + username + "';" +
                             "var inputs = document.getElementsByTagName('input');" +
                             "for (var i = 0; i < inputs.length; i++) {" +
                                 "if (inputs[i].name.toLowerCase() === 'pwd') {" +
@@ -119,13 +116,7 @@ public class LoginProcess extends AppCompatActivity {
                                     "inputs[i].value = objAccount;" +
                                 "}" +
                             "}" +
-                            "if (objAccount != null) {" +
-                                "console.log('objAccount: ' + objAccount + ';');" +
-                                "str += objAccount.value;" +
-                            "}" +
-                            "if (objPWD != null) { " +
-                                 "str += ' , ' + objPWD.value;" +
-                            "}" +
+                            "console.log({'objAccount': objAccount, 'objPWS': objPWD});" +
                             "document.getElementById('loginform').submit();";
                         return js;
                     }
